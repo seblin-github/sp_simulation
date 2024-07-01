@@ -65,8 +65,9 @@ class heston:
         
         return self.paths
 
-class OrnsteinUhlenbeckProcess:
+class ornsteinUhlenbeck:
     def __init__(self, theta, mu, sigma, jump_intensity=None, jump_mean=None, jump_std=None):
+        # Optional jump process (for electricity price simulation) 
         self.theta = theta
         self.mu = mu
         self.sigma = sigma
@@ -119,22 +120,16 @@ def main():
     S0 = 100
     mu = 0.07
     sigma = 0.9
-    V0 = 0.04
-    kappa = 2.0
-    theta = 0.04
-    rho = -0.7
-    hestonObj = heston(S0, V0, mu, kappa, theta, sigma, rho)
-
     theta = 2
     jump_i = 0.5
     jump_mean = 1
     jump_std = 0.1
-    ornsteinObj = OrnsteinUhlenbeckProcess(theta, S0*(1 + mu), sigma, jump_i, jump_mean, jump_std)
+    ornsteinObj = ornsteinUhlenbeck(theta, S0*(1 + mu), sigma, jump_i, jump_mean, jump_std)
 
     T = 2
     dt = 1/365
     N = 100
-    hestonObj.simulate(T, dt, N)
+
     ornsteinObj.simulate(T, dt, N)
     plot_paths(ornsteinObj.paths)
 
