@@ -66,8 +66,9 @@ class heston:
         return self.paths
 
 class ornsteinUhlenbeck:
-    def __init__(self, theta, mu, sigma, jump_intensity=None, jump_mean=None, jump_std=None):
+    def __init__(self,S0, theta, mu, sigma, jump_intensity=None, jump_mean=None, jump_std=None):
         # Optional jump process (for electricity price simulation) 
+        self.S = S0
         self.theta = theta
         self.mu = mu
         self.sigma = sigma
@@ -82,7 +83,7 @@ class ornsteinUhlenbeck:
         
         for i in range(N):
             X = np.zeros(timesteps+1)
-            X[0] = self.mu
+            X[0] = self.S
             
             for j in range(1, timesteps+1):
                 dW = np.sqrt(dt) * np.random.randn()
@@ -118,13 +119,13 @@ def plot_paths(paths, num_paths=10):
 
 def main():
     S0 = 100
-    mu = 0.07
+    mu = 0.02
     sigma = 0.9
     theta = 2
     jump_i = 0.5
     jump_mean = 1
     jump_std = 0.1
-    ornsteinObj = ornsteinUhlenbeck(theta, S0*(1 + mu), sigma, jump_i, jump_mean, jump_std)
+    ornsteinObj = ornsteinUhlenbeck(S0, theta, S0*(1 + mu), sigma, jump_i, jump_mean, jump_std)
 
     T = 2
     dt = 1/365
