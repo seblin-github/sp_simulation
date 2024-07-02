@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sobol_seq import i4_sobol_generate
 from scipy.stats import norm
+from sobolNormal import generate_standard_normal_matrix
 
 class geometricBrownianMotion:
     def __init__(self, S0, mu, sigma):
@@ -18,7 +19,7 @@ class geometricBrownianMotion:
         num_steps = int(T/dt)
         paths = np.zeros((N, num_steps + 1))
         paths[:, 0] = self.S0
-        W_mat = np.random.randn(num_steps+1,N)
+        W_mat = generate_standard_normal_matrix(num_steps+1,N)
 
         for t in range(1, num_steps + 1):
             W = W_mat[t, :]
@@ -50,8 +51,8 @@ class heston:
         S[:, 0] = self.S0
         V[:, 0] = self.V0
         
-        Z1 = np.random.randn(num_steps+1,N)
-        Z2 = np.random.randn(num_steps+1,N)
+        Z1 = generate_standard_normal_matrix(num_steps+1,N)
+        Z2 = generate_standard_normal_matrix(num_steps+1,N)
         W1 = Z1
         W2 = self.rho * Z1 + np.sqrt(1 - self.rho**2) * Z2
         
@@ -83,7 +84,7 @@ class ornsteinUhlenbeck:
     def simulate(self, T, dt, N, jump=True):
         num_steps = int(T / dt)
         self.paths = np.zeros((N, num_steps+1))
-        W_mat = generateSobolNormal(num_steps+1,N, 1)
+        W_mat = generate_standard_normal_matrix(num_steps+1,N)
         
         # Simulate the paths, Euler-Maruyama
         for i in range(N):
@@ -102,24 +103,6 @@ class ornsteinUhlenbeck:
             self.paths[i, :] = X
         
         return self.paths
-    
-def generateSobolNormal(M, N, dim_num=1):
-    if dim_num > 40:
-        raise ValueError("Maxmimum 40 dimension.")
-    # Generate Sobol sequences
-    sobol_sequence = i4_sobol_generate(dim_num, M * N).T
-    
-    # Scramble the Sobol sequence
-    permuted_indices = np.random.permutation(M * N)
-    scrambled_sequence = sobol_sequence[:, permuted_indices]
-    
-    # Transform to standard normal distribution
-    transformed_sequence = norm.ppf(scrambled_sequence)
-    
-    # Reshape the transformed sequence into M x N matrix
-    transformed_matrix = transformed_sequence.reshape((M, N))
-    
-    return transformed_matrix
 
 def plot_paths(paths, num_paths=10):
     # plot simulates paths of gBM
@@ -138,7 +121,6 @@ def plot_paths(paths, num_paths=10):
     plt.xlabel('Time')
     plt.ylabel('Price')
     plt.show()
-    return -1
 
 def main():
     S0 = 100

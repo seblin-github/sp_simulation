@@ -3,7 +3,7 @@ from stochasticSim import geometricBrownianMotion as gbm
 from stochasticSim import plot_paths
 import math
 
-INTEREST_RATE = 0.057
+INTEREST_RATE = 0.05
 
 # ---------------------------------------------------------------------------------------------------  
 
@@ -109,7 +109,7 @@ class gbmOption:
         r = INTEREST_RATE
         T = self.option_parameters.expiry
         dt = 1/252
-        N = 10000 #Monte carlo error roughly < 2e-3
+        N = 100000 #Monte carlo error roughly < 2e-3
         paths = self.underlying.simulate(T, dt, N)
         paths = paths.T # Do this nicer, be consistent
         K = self.option_parameters.strike
@@ -214,9 +214,9 @@ def norm_pdf(x):
 def test_calc():
     # Sample parameters
     S0 = 100  # Initial stock price
-    mu = 0.057  # Drift
+    mu = 0.05  # Drift
     sigma = 0.2  # Volatility
-    strike = 110  # Strike price
+    strike = 105  # Strike price
     expiry = 1  # Time to expiration (1 year)
 
     # Create GBM and option parameters objects
