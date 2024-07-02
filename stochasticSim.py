@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from sobol_seq import i4_sobol_generate
+from scipy.stats import norm
 
 class geometricBrownianMotion:
     def __init__(self, S0, mu, sigma):
@@ -16,9 +18,10 @@ class geometricBrownianMotion:
         num_steps = int(T/dt)
         paths = np.zeros((N, num_steps + 1))
         paths[:, 0] = self.S0
+        W_mat = np.random.randn(num_steps+1,N)
 
         for t in range(1, num_steps + 1):
-            W = np.random.normal(0, 1, N)
+            W = W_mat[t, :]
             paths[:, t] = paths[:, t -1] * np.exp((self.mu - 0.5 * self.sigma ** 2) * dt + self.sigma * np.sqrt(dt) * W)
 
         self.paths = paths
@@ -47,12 +50,12 @@ class heston:
         S[:, 0] = self.S0
         V[:, 0] = self.V0
         
-        Z1 = np.random.normal(0, 1, (N, num_steps))
-        Z2 = np.random.normal(0, 1, (N, num_steps))
+        Z1 = np.random.randn(num_steps+1,N)
+        Z2 = np.random.randn(num_steps+1,N)
         W1 = Z1
         W2 = self.rho * Z1 + np.sqrt(1 - self.rho**2) * Z2
         
-        # Simulate the paths
+        # Simulate the paths, Euler-Maruyama
         for t in range(1, num_steps + 1):
             V[:, t] = np.maximum(V[:, t-1] + self.kappa * (self.theta - V[:, t-1]) * dt + 
                                     self.sigma * np.sqrt(V[:, t-1]) * np.sqrt(dt) * W2[:, t-1], 0)
@@ -78,15 +81,17 @@ class ornsteinUhlenbeck:
         self.paths = None
         
     def simulate(self, T, dt, N, jump=True):
-        timesteps = int(T / dt)
-        self.paths = np.zeros((N, timesteps+1))
+        num_steps = int(T / dt)
+        self.paths = np.zeros((N, num_steps+1))
+        W_mat = generateSobolNormal(num_steps+1,N, 1)
         
+        # Simulate the paths, Euler-Maruyama
         for i in range(N):
-            X = np.zeros(timesteps+1)
+            X = np.zeros(num_steps+1)
             X[0] = self.S
             
-            for j in range(1, timesteps+1):
-                dW = np.sqrt(dt) * np.random.randn()
+            for j in range(1, num_steps+1):
+                dW = np.sqrt(dt) * W_mat[j, i]
                 X[j] = X[j-1] + self.theta * (self.mu - X[j-1]) * dt + self.sigma * dW
                 
                 if jump and self.jump_intensity is not None and self.jump_mean is not None and self.jump_std is not None:
@@ -96,7 +101,25 @@ class ornsteinUhlenbeck:
             
             self.paths[i, :] = X
         
-        return np.linspace(0., T, timesteps+1), self.paths
+        return self.paths
+    
+def generateSobolNormal(M, N, dim_num=1):
+    if dim_num > 40:
+        raise ValueError("Maxmimum 40 dimension.")
+    # Generate Sobol sequences
+    sobol_sequence = i4_sobol_generate(dim_num, M * N).T
+    
+    # Scramble the Sobol sequence
+    permuted_indices = np.random.permutation(M * N)
+    scrambled_sequence = sobol_sequence[:, permuted_indices]
+    
+    # Transform to standard normal distribution
+    transformed_sequence = norm.ppf(scrambled_sequence)
+    
+    # Reshape the transformed sequence into M x N matrix
+    transformed_matrix = transformed_sequence.reshape((M, N))
+    
+    return transformed_matrix
 
 def plot_paths(paths, num_paths=10):
     # plot simulates paths of gBM
@@ -119,13 +142,13 @@ def plot_paths(paths, num_paths=10):
 
 def main():
     S0 = 100
-    mu = 0.02
+    mu = 102
     sigma = 0.9
-    theta = 2
+    theta = 1
     jump_i = 0.5
-    jump_mean = 1
+    jump_mean = 0.1
     jump_std = 0.1
-    ornsteinObj = ornsteinUhlenbeck(S0, theta, S0*(1 + mu), sigma, jump_i, jump_mean, jump_std)
+    ornsteinObj = ornsteinUhlenbeck(S0, theta, mu, sigma, jump_i, jump_mean, jump_std)
 
     T = 2
     dt = 1/365
