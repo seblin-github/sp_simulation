@@ -1,11 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from sobol_seq import i4_sobol_generate
-from scipy.stats import norm
 from sobolNormal import generate_standard_normal_matrix
 
-class geometricBrownianMotion:
+class StochasticModel:
+    def __init__(self, identifier):
+        self.identifier = identifier
+
+class geometricBrownianMotion(StochasticModel):
     def __init__(self, S0, mu, sigma):
+        super().__init__("gbm")
         self.S0 = S0        #Spot price at t=0
         self.mu = mu        #Drift of gBM
         self.sigma = sigma  #volatility of gBM
@@ -28,8 +31,9 @@ class geometricBrownianMotion:
         self.paths = paths
         return paths
 
-class heston:
+class heston(StochasticModel):
     def __init__(self, S0, V0, mu, kappa, theta, sigma, rho):
+        super().__init__("heston")
         self.S0 = S0            # Spot price at t=0
         self.V0 = V0            # Volatility at t=0
         self.mu = mu            # Drift of Heston
@@ -69,9 +73,10 @@ class heston:
         
         return self.paths
 
-class ornsteinUhlenbeck:
+class ornsteinUhlenbeck(StochasticModel):
     def __init__(self,S0, theta, mu, sigma, jump_intensity=None, jump_mean=None, jump_std=None):
         # Optional jump process (for electricity price simulation) 
+        super().__init__("Ornstein-Uhlenbeck")
         self.S = S0
         self.theta = theta
         self.mu = mu
@@ -137,6 +142,7 @@ def main():
     N = 100
 
     ornsteinObj.simulate(T, dt, N)
+    print(ornsteinObj.identifier)
     plot_paths(ornsteinObj.paths)
 
 if __name__ == "__main__":
