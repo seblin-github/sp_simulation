@@ -1,8 +1,10 @@
 import numpy as np
 import math
 from scipy.stats import qmc
-import matplotlib.pyplot as plt
-import scipy.stats as stats
+
+#Generate 2-dimensional Sobol Sequence
+#Box-Muller transform to standard normal
+#Reshape to M*N matrix
 
 def generate_sobol_sequences(M, N):
     # Calculate the number of points needed for the Sobol sequence

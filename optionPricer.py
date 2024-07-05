@@ -1,7 +1,7 @@
 import numpy as np
 from stochasticSim import geometricBrownianMotion as gbm
 from stochasticSim import heston
-from stochasticSim import plot_paths
+import scipy as scp
 import math
 
 INTEREST_RATE = 0.057
@@ -26,7 +26,8 @@ class stockOption:
             }
         elif gbmObj.identifier == "heston":
             option_pricers = {
-                "American": heston_american_fd,
+                "European": european_mc,
+                "American": american_mc,
                 "Asian": asian_mc,
                 "Barrier": barrier_mc,
                 # ...
@@ -111,14 +112,35 @@ def gbm_european_asol(optionObj):
     return price
 
 # - - - Monte Carlo
-def american_mc(optionObj):
-    # Least-Squares Monte Carlo to price American put (Longstaff Schwartz)
+def european_mc(optionObj):
     r = INTEREST_RATE
     T = optionObj.option_parameters.expiry
-    dt = 1/252  # Twice a day
-    N = 10000  # Number of paths, needs a lot
+    dt = 1/252
+    N = 10000 #Monte carlo error roughly < 2e-3
+    strike = optionObj.option_parameters.strike
     paths = optionObj.underlying.simulate(T, dt, N)
-    paths = paths.T  # Transpose to have shape (steps, N)
+    
+    discount_factor = np.exp(-r * T)
+    
+    if optionObj.option_parameters.option_direction == 'call':
+        payoff = np.maximum(paths[:, -1] - strike, 0)
+    elif optionObj.option_parameters.option_direction == 'put':
+        payoff = np.maximum(strike - paths[:, -1], 0)
+    else:
+        raise ValueError("Invalid option type. Choose 'call' or 'put'.")
+    
+    price = discount_factor * np.mean(payoff)
+    
+    return price
+    
+def american_mc(optionObj):
+    # Longstaff - Schwartz
+    # Parameters
+    r = INTEREST_RATE
+    T = optionObj.option_parameters.expiry
+    dt = 1/252
+    N = 10000  # Number of paths
+    paths = optionObj.underlying.simulate(T, dt, N)
     K = optionObj.option_parameters.strike
     steps = int(T / dt)
     
@@ -133,14 +155,12 @@ def american_mc(optionObj):
     
     # Cashflow matrix (initialize with final payoffs)
     cashflows = np.zeros_like(payoffs)
-    cashflows[-1] = payoffs[-1]
-
+    cashflows[:, -1] = payoffs[:, -1]
     # Backward induction using least squares regression
-    for t in range(steps - 1, 0, -1):
-        in_the_money = payoffs[t] > 0
-        X = paths[t, in_the_money]
-        Y = cashflows[t + 1, in_the_money] * discount_factor
-        
+    for t in range(steps - 1, -1, -1):
+        in_the_money = payoffs[:, t] > 0
+        X = payoffs[in_the_money, t]
+        Y = cashflows[in_the_money, t + 1] * discount_factor
         if len(X) == 0:
             continue
 
@@ -149,19 +169,21 @@ def american_mc(optionObj):
         beta = np.linalg.lstsq(A, Y, rcond=None)[0]
         continuation_value = np.dot(A, beta)
         
-        exercise = payoffs[t, in_the_money] > continuation_value
-        cashflows[t, in_the_money] = np.where(exercise, payoffs[t, in_the_money], cashflows[t + 1, in_the_money] * discount_factor)
+        exercise = payoffs[in_the_money, t] > continuation_value
+        cashflows[in_the_money, t] = np.where(exercise, payoffs[in_the_money, t], cashflows[in_the_money, t + 1] * discount_factor)
+        discount_path = cashflows[:, t] == 0
+        cashflows[discount_path, t] = cashflows[discount_path, t + 1] * discount_factor
 
     # Price is the discounted average of the first row of cashflows
-    price = np.mean(cashflows[1]) * discount_factor
+    price = np.mean(cashflows[:, 1]) * discount_factor
     return price
 
 def asian_mc(optionObj):
     #Monte Carlo
     r = INTEREST_RATE
     T = optionObj.option_parameters.expiry
-    dt = 1/504 #Twice a day
-    N = 100000
+    dt = 1/252
+    N = 10000
     paths = optionObj.underlying.simulate(T, dt, N)
     paths = paths.T # Do this nicer, be consistent
     K = optionObj.option_parameters.strike
@@ -182,30 +204,29 @@ def barrier_mc(optionObj):
     r = INTEREST_RATE
     T = optionObj.option_parameters.expiry
     dt = 1/252
-    N = 100000 #Monte carlo error roughly < 2e-3
+    N = 10000 #Monte carlo error roughly < 2e-3
     paths = optionObj.underlying.simulate(T, dt, N)
-    paths = paths.T # Do this nicer, be consistent
     K = optionObj.option_parameters.strike
     barrier_type = optionObj.option_parameters.extra_params['barrier_type']
     barrier_level = optionObj.option_parameters.extra_params['barrier']
 
     # Check barrier conditions
     if barrier_type == 'up-and-in':
-        hit_barrier = np.any(paths >= barrier_level, axis=0)
+        hit_barrier = np.any(paths >= barrier_level, axis=1)
     elif barrier_type == 'down-and-in':
-        hit_barrier = np.any(paths <= barrier_level, axis=0)
+        hit_barrier = np.any(paths <= barrier_level, axis=1)
     elif barrier_type == 'up-and-out':
-        hit_barrier = np.any(paths >= barrier_level, axis=0)
+        hit_barrier = np.any(paths >= barrier_level, axis=1)
     elif barrier_type == 'down-and-out':
-        hit_barrier = np.any(paths <= barrier_level, axis=0)
+        hit_barrier = np.any(paths <= barrier_level, axis=1)
     else:
         raise ValueError("Invalid barrier type. Use 'up-and-in', 'down-and-in', 'up-and-out', or 'down-and-out'.")
 
     # Calculate the payoff for in-the-money paths
     if optionObj.option_parameters.option_direction == "call":
-        payoffs = np.maximum(paths[-1] - K, 0)
+        payoffs = np.maximum(paths[:, -1] - K, 0)
     elif optionObj.option_parameters.option_direction == "put":
-        payoffs = np.maximum(K - paths[-1], 0)
+        payoffs = np.maximum(K - paths[:, -1], 0)
 
     # Apply barrier conditions
     if 'in' in barrier_type:
@@ -215,7 +236,7 @@ def barrier_mc(optionObj):
 
     # Discount the payoff back to present value
     discount_factor = np.exp(-r * T)
-    price = discount_factor * np.mean(call_payoffs)
+    price = discount_factor * np.mean(payoffs)
     return price
 
 # - - - Finite difference
@@ -282,7 +303,8 @@ def gbm_american_fd(optionObj):
     return price
 
 def heston_american_fd(optionObj):
-
+    # NOT WORKING !!!
+    return -1
     S0 = optionObj.underlying.S0
     r = INTEREST_RATE
     sigma = optionObj.underlying.sigma
@@ -383,30 +405,30 @@ def norm_pdf(x):
 def test_calc():
     # Sample parameters
     S0 = 100  # Initial stock price
-    mu = 0.05  # Drift
-    sigma = 0.2  # Volatility
-    theta = 0.2 # Long-term variance
-    kappa = 0.5 # Rate of mean reversion
+    mu = 0.057  # Drift
+    sSigma = 0.2  # Volatility
+    theta = sSigma ** 2 # Long-term variance
+    kappa = 1.57 # Rate of mean reversion
     rho = -0.7 # Correlation between Wiener of stock and variance
     vSigma = 0.3 # Volatility of volatility
 
     strike = 100 # Strike price
-    expiry = 2  # Time to expiration (1 year)
+    expiry = 1  # Time to expiration (1 year)
 
     # Create GBM and option parameters objects
-    gbmObj = gbm(S0=S0, mu=mu, sigma=sigma)
-    hestonObj = heston(S0= S0, V0=sigma, mu=mu, kappa=kappa, theta=theta,sigma=vSigma, rho= rho)
-    params_european =optionParameters(strike=strike, expiry=expiry, option_direction = "put")
-    params_american =optionParameters(strike=strike, expiry=expiry, option_direction = "put")
+    gbmObj = gbm(S0=S0, mu=mu, sigma=sSigma)
+    params_european =optionParameters(strike=strike, expiry=expiry, option_direction = "call")
+    params_bin =optionParameters(strike=strike, expiry=expiry, option_direction = "call", barrier_type = "up-and-in", barrier = 100)
+    params_bout =optionParameters(strike=strike, expiry=expiry, option_direction = "call", barrier_type = "up-and-out", barrier = 100)
 
     # Create option objects
     european_option = stockOption(gbmObj, "European", params_european)
-    american_option = stockOption(gbmObj, "American", params_american)
-    heston_american_option = stockOption(hestonObj, "American", params_american)
+    bin_option = stockOption(gbmObj, "Barrier", params_bin)
+    bout_option = stockOption(gbmObj, "Barrier", params_bout)
 
     print(european_option.price)
-    print(american_option.price)
-    print(heston_american_option.price)
+    print(bin_option.price + bout_option.price)
+
 # ---------------------------------------------------------------------------------------------------  
 
 def main():

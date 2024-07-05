@@ -1,6 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sobolNormal import generate_standard_normal_matrix
+import scipy.stats as ss
+
+# .simulate returns matrix of paths (N by M)
+# N: simulation
+# M: timestep
 
 class StochasticModel:
     def __init__(self, identifier):
@@ -22,7 +27,7 @@ class geometricBrownianMotion(StochasticModel):
         num_steps = int(T/dt)
         paths = np.zeros((N, num_steps + 1))
         paths[:, 0] = self.S0
-        W_mat = generate_standard_normal_matrix(num_steps+1,N)
+        W_mat = np.random.randn(num_steps+1, N) #generate_standard_normal_matrix(num_steps+1,N)
 
         for t in range(1, num_steps + 1):
             W = W_mat[t, :]
@@ -55,11 +60,11 @@ class heston(StochasticModel):
         S[:, 0] = self.S0
         V[:, 0] = self.V0
         
-        Z1 = generate_standard_normal_matrix(num_steps+1,N)
-        Z2 = generate_standard_normal_matrix(num_steps+1,N)
+        Z1 = np.random.randn(N, num_steps+1) #Sobol needs to be reviewed for heston
+        Z2 = np.random.randn(N, num_steps+1) #Sobol needs to be reviewed for heston
         W1 = Z1
-        W2 = self.rho * Z1 + np.sqrt(1 - self.rho**2) * Z2
-        
+        W2 = self.rho * Z1 + np.sqrt(1 - self.rho**2) * Z2   
+
         # Simulate the paths, Euler-Maruyama
         for t in range(1, num_steps + 1):
             V[:, t] = np.maximum(V[:, t-1] + self.kappa * (self.theta - V[:, t-1]) * dt + 
@@ -137,13 +142,22 @@ def main():
     jump_std = 0.1
     ornsteinObj = ornsteinUhlenbeck(S0, theta, mu, sigma, jump_i, jump_mean, jump_std)
 
+    S0 = 100  # Initial stock price
+    mu = 0.05  # Drift
+    sigma = 0.2  # Volatility
+    theta = 0.3 # Long-term variance
+    kappa = 0.1 # Rate of mean reversion
+    rho = -0.7 # Correlation between Wiener of stock and variance
+    vSigma = 0.3 # Volatility of volatility
+
+    hestonObj = heston(S0= S0, V0=sigma, mu=mu, kappa=kappa, theta=theta,sigma=vSigma, rho= rho)
+
     T = 2
     dt = 1/365
     N = 100
 
-    ornsteinObj.simulate(T, dt, N)
-    print(ornsteinObj.identifier)
-    plot_paths(ornsteinObj.paths)
+    hestonObj.simulate(T, dt, N)
+    plot_paths(hestonObj.paths)
 
 if __name__ == "__main__":
     main()
