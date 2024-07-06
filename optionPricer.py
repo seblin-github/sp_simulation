@@ -21,7 +21,7 @@ class stockOption:
                 "European": gbm_european_asol,
                 "American": gbm_american_fd,
                 "Asian": asian_mc,
-                "Barrier": barrier_mc,
+                "Barrier": gbm_barrier_asol,
                 # ...
             }
         elif gbmObj.identifier == "heston":
@@ -138,8 +138,6 @@ def gbm_barrier_asol(optionObj):
     d8_val = d3(T, S0*K/(barrier_level ** 2))
     a = (barrier_level/S0) ** (-1 + 2*r/(sigma ** 2))
     b = (barrier_level/S0) ** (1 + 2*r/(sigma ** 2))
-    c = (barrier_level/S0) ** (1 - 2*r/(sigma ** 2))
-    d = (barrier_level/S0) ** (-2*r/(sigma ** 2))
 
     if optionObj.option_parameters.option_direction == "call":
         if 'up' in barrier_type:
@@ -288,7 +286,7 @@ def barrier_mc(optionObj):
     r = INTEREST_RATE
     T = optionObj.option_parameters.expiry
     dt = 1/252
-    N = 500000 #Monte carlo error roughly < 2e-3
+    N = 100000 #Monte carlo error roughly < 2e-3
     paths = optionObj.underlying.simulate(T, dt, N)
     K = optionObj.option_parameters.strike
     barrier_type = optionObj.option_parameters.extra_params['barrier_type']
@@ -514,11 +512,10 @@ def test_calc():
     print(bin_option.price + bout_option.price)
     """
     gbmObj = gbm(S0=S0, mu=mu, sigma=sSigma)
-    params_barrier = optionParameters(strike=strike, expiry=expiry, option_direction = "call", barrier_type = "up-and-out", barrier =130)
-    barrier_option = stockOption(gbmObj, "Barrier", params_barrier)
-
-    print(gbm_barrier_asol(barrier_option))
-    print(barrier_mc(barrier_option))
+    #params_barrier = optionParameters(strike=strike, expiry=expiry, option_direction = "call", barrier_type = "up-and-out", barrier =130)
+    params_barrier = optionParameters(strike=strike, expiry=expiry, option_direction = "call")
+    asian_option = stockOption(gbmObj, "Asian", params_barrier)
+    print(asian_option.price)
 
 # ---------------------------------------------------------------------------------------------------  
 

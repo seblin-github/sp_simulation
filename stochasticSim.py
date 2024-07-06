@@ -60,17 +60,17 @@ class heston(StochasticModel):
         S[:, 0] = self.S0
         V[:, 0] = self.V0
         
-        Z1 = np.random.randn(N, num_steps+1) #Sobol needs to be reviewed for heston
-        Z2 = np.random.randn(N, num_steps+1) #Sobol needs to be reviewed for heston
+        Z1 = np.random.randn(num_steps+1, N) #Sobol needs to be reviewed for heston
+        Z2 = np.random.randn(num_steps+1, N) #Sobol needs to be reviewed for heston
         W1 = Z1
         W2 = self.rho * Z1 + np.sqrt(1 - self.rho**2) * Z2   
 
         # Simulate the paths, Euler-Maruyama
         for t in range(1, num_steps + 1):
             V[:, t] = np.maximum(V[:, t-1] + self.kappa * (self.theta - V[:, t-1]) * dt + 
-                                    self.sigma * np.sqrt(V[:, t-1]) * np.sqrt(dt) * W2[:, t-1], 0)
+                                    self.sigma * np.sqrt(V[:, t-1]) * np.sqrt(dt) * W2[t-1, :], 0)
             S[:, t] = S[:, t-1] * np.exp((self.mu - 0.5 * V[:, t-1]) * dt + 
-                                            np.sqrt(V[:, t-1]) * np.sqrt(dt) * W1[:, t-1])
+                                            np.sqrt(V[:, t-1]) * np.sqrt(dt) * W1[t-1, :])
         
         # Save the paths to the class attribute
         self.paths = S
@@ -81,7 +81,7 @@ class heston(StochasticModel):
 class ornsteinUhlenbeck(StochasticModel):
     def __init__(self,S0, theta, mu, sigma, jump_intensity=None, jump_mean=None, jump_std=None):
         # Optional jump process (for electricity price simulation) 
-        super().__init__("Ornstein-Uhlenbeck")
+        super().__init__("ornstein-uhlenbeck")
         self.S = S0
         self.theta = theta
         self.mu = mu
