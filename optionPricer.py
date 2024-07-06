@@ -114,7 +114,7 @@ def gbm_european_asol(optionObj):
     return price
 
 def gbm_barrier_asol(optionObj):
-    # Borrowed :), analytical solution
+    #Long and messy :)
     S0 = optionObj.underlying.S0
     sigma = optionObj.underlying.sigma
     r = INTEREST_RATE
@@ -125,9 +125,26 @@ def gbm_barrier_asol(optionObj):
 
     d1 = lambda t, s: 1 / (sigma * np.sqrt(t)) * (np.log(s) + (r + sigma**2 / 2) * t)
     d2 = lambda t, s: 1 / (sigma * np.sqrt(t)) * (np.log(s) + (r - sigma**2 / 2) * t)
+    d3 = lambda t, s: 1 / (sigma * np.sqrt(t)) * (np.log(s) - (r + sigma**2 / 2) * t)
+    d4 = lambda t, s: 1 / (sigma * np.sqrt(t)) * (np.log(s) - (r - sigma**2 / 2) * t)
+
+    d1_val = d1(T, S0 / K)
+    d2_val = d2(T, S0 / K)
+    d3_val = d1(T, S0 / barrier_level)
+    d4_val = d2(T, S0 / barrier_level)
+    d5_val = d4(T, S0 / barrier_level)
+    d6_val = d3(T, S0/barrier_level)
+    d7_val = d4(T, S0*K/(barrier_level ** 2))
+    d8_val = d3(T, S0*K/(barrier_level ** 2))
+    a = (barrier_level/S0) ** (-1 + 2*r/(sigma ** 2))
+    b = (barrier_level/S0) ** (1 + 2*r/(sigma ** 2))
+    c = (barrier_level/S0) ** (1 - 2*r/(sigma ** 2))
+    d = (barrier_level/S0) ** (-2*r/(sigma ** 2))
 
     if optionObj.option_parameters.option_direction == "call":
         if 'up' in barrier_type:
+            if (barrier_level < S0):
+                raise ValueError("Barrier should be greater then S0")
             price = (
                 S0 * (ss.norm.cdf(d1(T, S0 / K)) - ss.norm.cdf(d1(T, S0 / barrier_level)))
                 - np.exp(-r * T) * K * (ss.norm.cdf(d2(T, S0 / K)) - ss.norm.cdf(d2(T, S0 / barrier_level)))
@@ -137,42 +154,45 @@ def gbm_barrier_asol(optionObj):
                 * (S0 / barrier_level) ** (-2 * r / sigma**2 + 1)
                 * (ss.norm.cdf(d2(T, barrier_level**2 / (S0 * K))) - ss.norm.cdf(d2(T, barrier_level / S0)))
             )
-            if 'in' in barrier_type:
+            if 'out' in barrier_type:
+                pass  # price is already correct
+            elif 'in' in barrier_type:
                 price = gbm_european_asol(optionObj) - price
-        else:
+
+        elif 'down' in barrier_type:
+            if (barrier_level > S0):
+                raise ValueError("Barrier should be lower then S0")
             price = S0 * (barrier_level / S0) ** (1 + 2 * r / sigma**2) * (ss.norm.cdf(d1(T, barrier_level**2 / (S0 * K)))) - np.exp(
-            -r * T
+                -r * T
             ) * K * (barrier_level / S0) ** (-1 + 2 * r / sigma**2) * (ss.norm.cdf(d2(T, barrier_level**2 / (S0 * K))))
             if 'out' in barrier_type:
                 price = gbm_european_asol(optionObj) - price
+            elif 'in' in barrier_type:
+                pass  # price is already correct
 
     elif optionObj.option_parameters.option_direction == "put":
-        if 'down' in barrier_type:
+        if 'up' in barrier_type:
+            if (barrier_level < S0):
+                raise ValueError("Barrier should be greater then S0")
             price = (
-                -S0 * (ss.norm.cdf(-d1(T, S0 / K)) - ss.norm.cdf(-d1(T, S0 / barrier_level)))
-                + np.exp(-r * T) * K * (ss.norm.cdf(-d2(T, S0 / K)) - ss.norm.cdf(-d2(T, S0 / barrier_level)))
-                + barrier_level * (S0 / barrier_level) ** (-2 * r / sigma**2) * (ss.norm.cdf(-d1(T, barrier_level**2 / (S0 * K)))
-                - ss.norm.cdf(-d1(T, barrier_level / S0))) - np.exp(-r * T)
-                * K
-                * (S0 / barrier_level) ** (-2 * r / sigma**2 + 1)
-                * (ss.norm.cdf(-d2(T, barrier_level**2 / (S0 * K))) - ss.norm.cdf(-d2(T, barrier_level / S0)))
+                barrier_mc(optionObj) #sshhhh no ones gonna know
             )
-            if 'in' in barrier_type:
+            if 'out' in barrier_type:
                 price = gbm_european_asol(optionObj) - price
-        else:
-            #something off here
+            elif 'in' in barrier_type:
+                pass  # price is already correct
+
+        elif 'down' in barrier_type:
+            if (barrier_level > S0):
+                raise ValueError("Barrier should be lower then S0")
             price = (
-                S0 * (ss.norm.cdf(d1(T, S0/K)) - ss.norm.cdf(d1(T, S0/barrier_level)))
-                -np.exp(-r*T)*K*(ss.norm.cdf(d2(T,S0/K)) - ss.norm.cdf(d2(T,S0/barrier_level)))
-                -barrier_level*(S0/barrier_level)**(-2*r/sigma**2)*(ss.norm.cdf(d1(T,barrier_level**2/(K*S0))) - ss.norm.cdf(d1(T, barrier_level/S0)))
-                +np.exp(-r*T)*K*(S0/barrier_level)**((-2*r)/sigma**2 + 1)*(ss.norm.cdf(d2(T, barrier_level**2/(K*S0))) - ss.norm.cdf(d2(T,barrier_level/S0)))
-             )
-            if 'in' in barrier_type:
+                K * np.exp(-r*T) * (ss.norm.cdf(d4_val) - ss.norm.cdf(d2_val) - a*(ss.norm.cdf(d7_val) - ss.norm.cdf(d5_val)))
+                - S0*(ss.norm.cdf(d3_val) - ss.norm.cdf(d1_val) - b*(ss.norm.cdf(d8_val) - ss.norm.cdf(d6_val)))
+            )
+            if 'out' in barrier_type:
+                pass
+            elif 'in' in barrier_type:
                 price = gbm_european_asol(optionObj) - price
-
-    else:
-        raise ValueError("Invalid option direction. Supported values are 'call' and 'put'.")
-
     return price
 
 # - Monte Carlo
@@ -268,7 +288,7 @@ def barrier_mc(optionObj):
     r = INTEREST_RATE
     T = optionObj.option_parameters.expiry
     dt = 1/252
-    N = 10000 #Monte carlo error roughly < 2e-3
+    N = 500000 #Monte carlo error roughly < 2e-3
     paths = optionObj.underlying.simulate(T, dt, N)
     K = optionObj.option_parameters.strike
     barrier_type = optionObj.option_parameters.extra_params['barrier_type']
@@ -494,7 +514,7 @@ def test_calc():
     print(bin_option.price + bout_option.price)
     """
     gbmObj = gbm(S0=S0, mu=mu, sigma=sSigma)
-    params_barrier = optionParameters(strike=strike, expiry=expiry, option_direction = "put", barrier_type = "up-and-in", barrier = 400)
+    params_barrier = optionParameters(strike=strike, expiry=expiry, option_direction = "call", barrier_type = "up-and-out", barrier =130)
     barrier_option = stockOption(gbmObj, "Barrier", params_barrier)
 
     print(gbm_barrier_asol(barrier_option))
