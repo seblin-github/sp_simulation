@@ -1,7 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from sobolNormal import generate_standard_normal_matrix
-import scipy.stats as ss
 
 # .simulate returns matrix of paths (N by M)
 # N: simulation
@@ -94,7 +92,7 @@ class ornsteinUhlenbeck(StochasticModel):
     def simulate(self, T, dt, N, jump=True):
         num_steps = int(T / dt)
         self.paths = np.zeros((N, num_steps+1))
-        W_mat = generate_standard_normal_matrix(num_steps+1,N)
+        W_mat = np.random.randn(num_steps+1,N)
         
         # Simulate the paths, Euler-Maruyama
         for i in range(N):
@@ -153,8 +151,8 @@ def main():
     hestonObj = heston(S0= S0, V0=sigma, mu=mu, kappa=kappa, theta=theta,sigma=vSigma, rho= rho)
 
     T = 2
-    dt = 1/365
-    N = 100
+    dt = 1/5000
+    N = 10
 
     hestonObj.simulate(T, dt, N)
     plot_paths(hestonObj.paths)

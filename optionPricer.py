@@ -1,6 +1,7 @@
 import numpy as np
 from stochasticSim import geometricBrownianMotion as gbm
 from stochasticSim import heston
+from stochasticSim import plot_paths
 import scipy.stats as ss
 import math
 
@@ -485,7 +486,7 @@ def norm_pdf(x):
     return (1.0 / math.sqrt(2 * math.pi)) * math.exp(-0.5 * x ** 2)
 
 def test_calc():
-    # Sample parameters
+    # Sample parameters, 2*kappa*theta > sigma ** 2 (Feller condition)
     S0 = 100  # Initial stock price
     mu = INTEREST_RATE  # Drift under Q
     sSigma = 0.2  # Volatility
@@ -516,6 +517,7 @@ def test_calc():
     params_barrier = optionParameters(strike=strike, expiry=expiry, option_direction = "call")
     asian_option = stockOption(gbmObj, "Asian", params_barrier)
     print(asian_option.price)
+    plot_paths(gbmObj.paths)
 
 # ---------------------------------------------------------------------------------------------------  
 
